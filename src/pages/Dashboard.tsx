@@ -45,6 +45,7 @@ const Dashboard = () => {
     }
   ]);
 
+  // Only show successful payments
   const successfulPayments = payments.filter(p => p.status === "success");
   const totalAmount = successfulPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -92,9 +93,9 @@ const Dashboard = () => {
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{payments.length}</div>
+              <div className="text-2xl font-bold">{successfulPayments.length}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {successfulPayments.length} successful, {payments.length - successfulPayments.length} failed
+                Successful transactions only
               </p>
             </CardContent>
           </Card>
@@ -108,7 +109,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Set(payments.map(p => p.name)).size}
+                {new Set(successfulPayments.map(p => p.name)).size}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Active payment users
@@ -142,14 +143,14 @@ const Dashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.length === 0 ? (
+                  {successfulPayments.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No transactions found
+                        No successful transactions found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    payments.map((payment) => (
+                    successfulPayments.map((payment) => (
                       <TableRow key={payment.id}>
                         <TableCell className="font-mono text-sm">
                           {payment.transactionId}
@@ -160,10 +161,10 @@ const Dashboard = () => {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={payment.status === "success" ? "default" : "destructive"}
-                            className={payment.status === "success" ? "bg-secondary hover:bg-secondary/90" : ""}
+                            variant="default"
+                            className="bg-secondary hover:bg-secondary/90"
                           >
-                            {payment.status === "success" ? "Success" : "Failed"}
+                            Success
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">

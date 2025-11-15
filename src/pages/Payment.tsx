@@ -44,20 +44,13 @@ const Payment = () => {
       return;
     }
 
-    setIsProcessing(true);
-
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      // Navigate to confirmation page with payment details
-      navigate("/confirmation", { 
-        state: { 
-          name: selectedName, 
-          amount: amount,
-          status: "success" // In production, this would come from actual payment gateway
-        } 
-      });
-    }, 2000);
+    // Navigate to UPI payment page
+    navigate("/upi-payment", { 
+      state: { 
+        name: selectedName, 
+        amount: amount
+      } 
+    });
   };
 
   return (
