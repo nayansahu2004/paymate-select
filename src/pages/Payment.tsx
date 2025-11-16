@@ -22,7 +22,25 @@ const Payment = () => {
     "Amit Patel",
     "Sneha Gupta",
     "Vikram Singh",
-    "Anita Reddy"
+    "Anita Reddy",
+    "Rahul Kumar",
+    "Priya Sharma",
+    "Amit Patel",
+    "Sneha Gupta",
+    "Vikram Singh",
+    "Anita Reddy",
+    "Rahul Kumar",
+    "Priya Sharma",
+    "Amit Patel",
+    "Sneha Gupta",
+    "Vikram Singh",
+    "Anita Reddy",
+    "Rahul Kumar",
+    "Priya Sharma",
+    "Amit Patel",
+    "Sneha Gupta",
+    "Vikram Singh",
+    "Anita Reddy",
   ];
 
   const handlePayment = async () => {
@@ -72,14 +90,14 @@ const Payment = () => {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
+                <User className="w-4 h-4 max-h-48 overflow-y-auto" />
                 Select Your Name
               </Label>
               <Select value={selectedName} onValueChange={setSelectedName}>
                 <SelectTrigger id="name">
                   <SelectValue placeholder="Choose your name" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-48 overflow-y-auto">
                   {userNames.map((name) => (
                     <SelectItem key={name} value={name}>
                       {name}

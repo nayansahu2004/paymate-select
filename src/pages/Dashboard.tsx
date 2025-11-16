@@ -125,10 +125,7 @@ const Dashboard = () => {
               <CardTitle>Recent Transactions</CardTitle>
               <CardDescription>A list of all payment transactions</CardDescription>
             </div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="w-4 h-4" />
-              Export
-            </Button>
+            
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
