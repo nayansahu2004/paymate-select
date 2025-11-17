@@ -1,37 +1,54 @@
-import { useState, useEffect } from "react";
+// src/pages/UPIPayment.tsx  (or wherever your file lives)
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import QRCode from "qrcode.react"; // install: npm i qrcode.react (optional)
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Smartphone, QrCode as QrIcon, Copy, CheckCircle2 } from "lucide-react";
 
 
+type PaymentState = { name: string; amount: string | number };
 
-const UPIPayment = () => {
+const UPIPayment: React.FC = () => {
+  // ui state
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [payPage, setPayPage] = useState<any>(null); // paypage token/url returned by server
+  const [payPage, setPayPage] = useState<any>(null);
+
+  // hooks
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
 
-  const { name, amount } = (location.state as any) || {};
+  // env
+  const API_BASE = import.meta.env.VITE_API_BASE
 
+  // typed state from navigation
+  const state = (location.state as PaymentState | undefined) ?? undefined;
+
+  // local copies of name/amount for use in UI/requests
+  const name = state?.name ?? "";
+  const amount = state?.amount ?? 0;
+
+  // guard: redirect if no input
   useEffect(() => {
-    if (!name || !amount) {
+    if (!state || !state.name || !state.amount) {
       toast({
         title: "Invalid Access",
         description: "Please start from the payment page",
         variant: "destructive",
       });
-      navigate("/");
+      // small delay so user can see toast (optional)
+      setTimeout(() => navigate("/"), 500);
     }
-  }, [name, amount, navigate, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run only once on mount
 
-  // keep existing fallback UPI info
+  // UPI fallback
   const upiId = "merchant@upi";
-  const upiLink = `upi://pay?pa=${upiId}&pn=Merchant&am=${amount}&cu=INR`;
+  const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent("Merchant")}&am=${amount}&cu=INR`;
 
   const handleCopyUPI = async () => {
     try {
@@ -40,22 +57,24 @@ const UPIPayment = () => {
       toast({ title: "Copied!", description: "UPI ID copied to clipboard" });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
+      // fallback copy
       const el = document.createElement("textarea");
       el.value = upiId;
       document.body.appendChild(el);
       el.select();
       document.execCommand("copy");
       document.body.removeChild(el);
-      toast({ title: "Copied (fallback)!" });
+      setCopied(true);
+      toast({ title: "Copied (fallback)!", description: "UPI ID copied using fallback" });
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  // NEW: create payment on server and open phonepe paypage
+  // create payment (calls your backend)
   const createPayment = async () => {
     setIsProcessing(true);
     try {
-      const res = await fetch("/api/create-payment", {
+      const res = await fetch(`${API_BASE}/api/create-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, amount }),
@@ -63,27 +82,27 @@ const UPIPayment = () => {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Create payment failed");
 
-      setOrderId(data.orderId);
-      setPayPage(data.phonepe); // store phonepe response (token/url)
+      setOrderId(data.orderId ?? null);
+      setPayPage(data.phonepe ?? null);
 
-      // If PhonePe returns an iframe URL / token, open it as instructed in docs
-      // Example: if data.phonepe.payUrl exists:
+      // If phonepe returns a redirect URL, open it (per docs you may embed iframe instead)
       if (data.phonepe?.redirectUrl) {
-        // open in new window/tab or embed iframe per doc guidance
         window.open(data.phonepe.redirectUrl, "_blank");
       } else if (data.phonepe?.iframeHtml) {
-        // optionally render iframe in modal (not shown here)
+        // you can render iframeHtml in a modal if needed
+        // For now, just notify user
+        toast({ title: "Payment started", description: "Complete payment in the opened PhonePe window" });
+      } else {
+        toast({ title: "Payment initiated", description: "Follow the instructions to complete payment" });
       }
-
-      toast({ title: "Payment initiated", description: "Complete payment in the PhonePe window" });
     } catch (err: any) {
-      toast({ title: "Payment error", description: err.message || "Could not start payment", variant: "destructive" });
+      toast({ title: "Payment error", description: err.message ?? "Could not start payment", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // NEW: verify payment by calling server-side Order Status API
+  // verify payment via your backend order-status endpoint
   const verifyPayment = async () => {
     if (!orderId) {
       toast({ title: "No order to verify", description: "Start payment first", variant: "destructive" });
@@ -91,11 +110,12 @@ const UPIPayment = () => {
     }
     setIsProcessing(true);
     try {
-      const res = await fetch(`/api/payment-status/${orderId}`);
+      const res = await fetch(`${API_BASE}/api/payment-status/${orderId}`);
       const body = await res.json();
-      // PhonePe response shape may vary — inspect body.data.payload.state or similar.
-      const status = body?.data?.payload?.state || body?.data?.status || body?.data?.order?.status;
-      if (status === "SUCCESS" || status === "completed") {
+
+      // inspect response shape from your backend/PhonePe
+      const status = body?.data?.payload?.state || body?.data?.status || body?.data?.order?.status || body?.status;
+      if (status === "SUCCESS" || status === "completed" || status === "COMPLETED") {
         navigate("/success", {
           state: {
             name,
@@ -105,15 +125,16 @@ const UPIPayment = () => {
           },
         });
       } else {
-        toast({ title: "Payment not completed", description: "Status: " + (status || "UNKNOWN") });
+        toast({ title: "Payment not completed", description: `Status: ${status ?? "UNKNOWN"}` });
       }
     } catch (err: any) {
-      toast({ title: "Verify failed", description: err.message || "Try again", variant: "destructive" });
+      toast({ title: "Verify failed", description: err.message ?? "Try again", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Render
   return (
     <div className="min-h-screen bg-gradient-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -130,6 +151,7 @@ const UPIPayment = () => {
             <CardTitle>Payment Details</CardTitle>
             <CardDescription>Scan QR or use UPI ID to pay. Or use PhonePe checkout below.</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-6">
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
               <div className="flex justify-between">
@@ -142,18 +164,37 @@ const UPIPayment = () => {
               </div>
             </div>
 
+            <div className="bg-background border-2 border-border rounded-lg p-6">
+              <div className="flex flex-col items-center space-y-4">
+                {/* render a real QR if qrcode.react installed, otherwise you can show an icon */}
+                <p className="text-sm text-muted-foreground">Scan with any UPI app</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground text-center">Or use UPI ID</p>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-muted px-4 py-2 rounded-md font-mono text-sm">{upiId}</div>
+                <Button variant="outline" size="sm" onClick={handleCopyUPI} className="gap-2">
+                  {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+
             <div className="pt-4 space-y-3">
-              {/* NEW: Start PhonePe checkout (server will return paypage token/url) */}
               <Button onClick={createPayment} disabled={isProcessing} className="w-full bg-gradient-primary" size="lg">
-                {isProcessing ? "Processing..." : "Pay with any UPI"}
+                {isProcessing ? "Processing..." : "Pay with PhonePe"}
               </Button>
 
-              {/* NEW: Verify status after completing payment */}
               <Button onClick={verifyPayment} disabled={isProcessing || !orderId} variant="outline" className="w-full" size="lg">
                 Verify Payment
               </Button>
 
-              <Button onClick={() => navigate("/")} variant="link" className="text-muted-foreground hover:text-foreground">Back to Payment Form</Button>
+              <div className="text-center">
+                <Button variant="link" onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground">
+                  Back to Payment Form
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
